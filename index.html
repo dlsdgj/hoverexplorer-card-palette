@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HoverExplorer 卡片配色批量生成器</title>
+<style>
+:root{--bg:#14161a;--panel:#1d2026;--line:#2c313a;--tx:#e6e8ec;--mu:#8b93a1;--ac:#6ea8ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 "Microsoft YaHei UI","Segoe UI",sans-serif}
+header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+h1{font-size:17px;margin:0}
+header span{color:var(--mu);font-size:12px}
+.tabs{display:flex;gap:4px;padding:12px 24px 0}
+.tab{padding:7px 16px;border:1px solid var(--line);border-bottom:none;border-radius:8px 8px 0 0;background:transparent;color:var(--mu);cursor:pointer;font:inherit}
+.tab.on{background:var(--panel);color:var(--tx)}
+.pane{display:none;margin:0 24px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:0 8px 8px 8px}
+.pane.on{display:block}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+label{color:var(--mu);font-size:12px}
+select,input,textarea,button{font:inherit;color:var(--tx);background:#111317;border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+input[type=number]{width:70px}
+textarea{width:100%;min-height:110px;resize:vertical;font-family:Consolas,monospace;font-size:12.5px}
+button{cursor:pointer}
+button:hover{border-color:var(--ac)}
+button.pri{background:var(--ac);color:#0b1220;border-color:var(--ac);font-weight:600}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:3px 10px;border-radius:99px;border:1px solid var(--line);cursor:pointer;font-size:12px;color:var(--mu);user-select:none}
+.chip.on{background:var(--ac);color:#0b1220;border-color:var(--ac)}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;padding:16px 24px 40px}
+.item{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stage{padding:18px 14px;display:flex;flex-direction:column;gap:8px}
+.stage.light{background:linear-gradient(135deg,#e3e9f1,#c8d2df)}
+.stage.dark{background:linear-gradient(135deg,#12151a,#2b313b)}
+.card{height:24px;display:flex;align-items:center;gap:8px;border-radius:4px;overflow:hidden;width:100%;max-width:280px;position:relative;white-space:nowrap}
+.card .s{align-self:stretch;flex:none}
+.card .n{flex:1;overflow:hidden;text-overflow:ellipsis;padding-left:6px}
+.card .b{flex:none;margin-right:5px;padding:0 6px;border-radius:3px;line-height:18px;font-size:.82em}
+.meta{padding:8px 12px 12px}
+.meta .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12px;color:var(--mu)}
+pre{margin:0;padding:8px 10px;background:#111317;border-radius:6px;font:12px/1.55 Consolas,monospace;color:#c9d1dc;white-space:pre-wrap;word-break:break-all}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;border:1px solid #fff2}
+.hint{color:var(--mu);font-size:12px}
+.bar{padding:12px 24px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header><h1>HoverExplorer 卡片配色批量生成器</h1><span>输出格式：9 行 key=value（bg / fg / badge_bg / badge_fg / strip / strip_w / font / font_size / radius）</span></header>
+
+<div class="tabs">
+  <button class="tab on" data-t="gen">本地批量生成</button>
+  <button class="tab" data-t="prompt">AI 提示词</button>
+  <button class="tab" data-t="imp">导入 AI 输出</button>
+</div>
+
+<div class="pane on" id="p-gen">
+  <div class="row"><label>风格（可多选，随机混合）</label></div>
+  <div class="chips" id="chips"></div>
+  <div class="row" style="margin-top:12px">
+    <label>数量</label><input type="number" id="cnt" value="12" min="1" max="60">
+    <label>色条宽度</label><select id="sw"><option value="r">随机 1–5</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
+    <label>字号</label><select id="fs"><option value="r">随机 10–13</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option></select>
+    <label>圆角</label><select id="rd"><option value="r">随机 0–10</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>12</option></select>
+    <label>预览底色</label><select id="bk"><option value="auto">自动</option><option value="light">浅色壁纸</option><option value="dark">深色壁纸</option></select>
+    <button class="pri" id="go">生成</button>
+    <button id="add">追加生成</button>
+  </div>
+</div>
+
+<div class="pane" id="p-prompt">
+  <div class="row"><label>风格描述</label><input id="style" style="flex:1;min-width:260px" value="冷色调极简"></div>
+  <div class="chips" id="pchips"></div>
+  <div class="row" style="margin-top:12px"><button class="pri" id="cp-prompt">复制提示词</button><span class="hint">丢给任意 LLM，把回复粘到「导入 AI 输出」即可预览</span></div>
+  <textarea id="ptext" readonly style="min-height:260px"></textarea>
+</div>
+
+<div class="pane" id="p-imp">
+  <div class="row"><span class="hint">粘贴一个或多个方案（空行、--- 或重复的 bg= 都会自动分段）</span></div>
+  <textarea id="itext" placeholder="bg=rgba(30,34,42,0.92)&#10;fg=rgba(230,234,240,1)&#10;..."></textarea>
+  <div class="row" style="margin-top:10px"><button class="pri" id="parse">解析并预览</button></div>
+</div>
+
+<div class="bar">
+  <button id="copyall">复制全部（以 --- 分隔）</button>
+  <button id="clear">清空</button>
+  <span class="hint" id="stat"></span>
+</div>
+<div id="grid"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const R=(a,b)=>a+Math.random()*(b-a);
+const RI=(a,b)=>Math.floor(R(a,b+1));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+
+/* ---------- 风格预设 ---------- */
+const P={
+ "冷色极简":{m:"light",h:[[190,230]],s:[8,22],bl:[94,98],ba:[.92,.98],ss:[45,70],sl:[52,62],f:["Segoe UI","Microsoft YaHei UI","Inter"]},
+ "暖色复古":{m:"light",h:[[20,45]],s:[30,50],bl:[88,94],ba:[.9,.96],ss:[45,65],sl:[38,50],f:["Georgia","KaiTi","SimSun","Palatino Linotype"]},
+ "高对比深色":{m:"dark",h:[[0,360]],s:[5,18],bl:[7,12],ba:[.94,.99],ss:[85,100],sl:[55,65],f:["Consolas","Cascadia Mono","Segoe UI Semibold"]},
+ "莫兰迪":{m:"light",h:[[10,40],[150,180],[260,290]],s:[10,22],bl:[84,90],ba:[.9,.95],ss:[18,30],sl:[52,62],f:["Microsoft YaHei UI","Segoe UI","DengXian"]},
+ "霓虹赛博":{m:"dark",h:[[280,330],[170,200]],s:[40,70],bl:[8,14],ba:[.88,.96],ss:[95,100],sl:[55,62],f:["Consolas","Cascadia Code","Lucida Console"]},
+ "森林自然":{m:"dark",h:[[100,160]],s:[18,32],bl:[12,19],ba:[.9,.96],ss:[40,60],sl:[48,60],f:["Segoe UI","Microsoft YaHei UI","Georgia"]},
+ "海洋蓝调":{m:"dark",h:[[195,225]],s:[35,55],bl:[13,20],ba:[.88,.95],ss:[65,85],sl:[55,65],f:["Segoe UI","Microsoft YaHei UI","Calibri"]},
+ "糖果马卡龙":{m:"light",h:[[0,360]],s:[55,80],bl:[90,95],ba:[.92,.97],ss:[60,80],sl:[62,72],f:["Comic Sans MS","Microsoft YaHei UI","Segoe UI"]},
+ "纸张墨水":{m:"light",h:[[35,55]],s:[18,32],bl:[92,96],ba:[.94,.98],ss:[0,12],sl:[15,30],f:["KaiTi","SimSun","Georgia","Times New Roman"]},
+ "玻璃拟态":{m:"dark",h:[[200,260]],s:[10,25],bl:[20,30],ba:[.45,.62],ss:[60,80],sl:[65,75],f:["Segoe UI Variable","Segoe UI","Microsoft YaHei UI"]},
+ "日落渐暖":{m:"dark",h:[[5,35]],s:[40,60],bl:[11,17],ba:[.9,.96],ss:[75,95],sl:[55,65],f:["Segoe UI","Microsoft YaHei UI","Trebuchet MS"]},
+ "孟菲斯撞色":{m:"light",h:[[0,360]],s:[70,95],bl:[82,90],ba:[.95,1],ss:[80,100],sl:[48,58],f:["Arial Black","Microsoft YaHei UI","Segoe UI Black"]}
+};
+const sel=new Set(["冷色极简","高对比深色","暖色复古"]);
+const chips=$("#chips");
+Object.keys(P).forEach(k=>{const c=document.createElement("span");c.className="chip"+(sel.has(k)?" on":"");c.textContent=k;
+ c.onclick=()=>{sel.has(k)?sel.delete(k):sel.add(k);c.classList.toggle("on")};chips.appendChild(c)});
+
+/* ---------- 颜色工具 ---------- */
+function hsl2rgb(h,s,l){h=((h%360)+360)%360;s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l);
+ const f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));return[f(0),f(8),f(4)].map(v=>Math.round(v*255))}
+const rgba=(c,a)=>`rgba(${c[0]},${c[1]},${c[2]},${(+a).toFixed(2).replace(/0+$/,"").replace(/\.$/,"")||0})`;
+const lum=c=>{const t=c.map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*t[0]+.7152*t[1]+.0722*t[2]};
+const cr=(a,b)=>{const x=lum(a),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
+const mix=(c,bk,a)=>c.map((v,i)=>v*a+bk[i]*(1-a));
+function parseRGBA(s){const m=/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?\s*\)/i.exec(s||"");
+ if(!m)return null;let a=m[4]===undefined?1:(m[4].endsWith("%")?parseFloat(m[4])/100:parseFloat(m[4]));return{c:[+m[1],+m[2],+m[3]],a}}
+
+/* ---------- 生成 ---------- */
+function gen(name){
+ const p=P[name],dark=p.m==="dark";
+ const hr=pick(p.h),h=R(hr[0],hr[1]);
+ const bgC=hsl2rgb(h,R(...p.s),R(...p.bl)),ba=R(...p.ba);
+ const backdrop=dark?[24,26,30]:[240,243,247];
+ const bgEff=mix(bgC,backdrop,ba);
+ // fg
+ const fgH=h+RI(-15,15);let fl=dark?92:14,fg;
+ for(let i=0;i<30;i++){fg=hsl2rgb(fgH,R(4,14),fl);if(cr(fg,bgEff)>=7)break;fl+=dark?1.5:-1.5}
+ // strip
+ const harmony=pick([0,0,30,-30,150,180,210]);
+ const sH=h+harmony;let sC=hsl2rgb(sH,R(...p.ss),R(...p.sl));
+ // badge
+ const useStrip=Math.random()<.6;
+ let bbC,bba;
+ if(useStrip){bbC=sC;bba=R(.85,1)}else{bbC=hsl2rgb(h+RI(-10,10),R(p.s[0],p.s[1]+15),dark?R(26,36):R(80,86));bba=R(.9,1)}
+ const bbEff=mix(bbC,bgEff,bba);
+ let bf=hsl2rgb(h,8,dark?95:10);
+ if(cr(bf,bbEff)<4.5)bf=cr([255,255,255],bbEff)>cr([15,15,15],bbEff)?[255,255,255]:[15,15,15];
+ return{bg:rgba(bgC,ba),fg:rgba(fg,1),badge_bg:rgba(bbC,bba),badge_fg:rgba(bf,1),strip:rgba(sC,1),
+  strip_w:$("#sw").value==="r"?RI(1,5):+$("#sw").value,font:pick(p.f),
+  font_size:$("#fs").value==="r"?RI(10,13):+$("#fs").value,
+  radius:$("#rd").value==="r"?RI(0,10):+$("#rd").value,_tag:name,_dark:dark}
+}
+const KEYS=["bg","fg","badge_bg","badge_fg","strip","strip_w","font","font_size","radius"];
+const toText=o=>KEYS.map(k=>`${k}=${o[k]}`).join("\n");
+
+/* ---------- 渲染 ---------- */
+let items=[];
+function render(){
+ const g=$("#grid");g.innerHTML="";
+ items.forEach((o,i)=>{
+  const bk=$("#bk").value;let mode=bk==="auto"?null:bk;
+  if(!mode){const p=parseRGBA(o.bg);mode=p&&lum(p.c)<.35?"dark":(o._dark===true?"dark":"light");
+   if(p&&lum(p.c)>=.35)mode="light"}
+  const el=document.createElement("div");el.className="item";
+  const names=["Quarterly-Report.pdf","design_notes","src","photo_0412.png"],badges=["PDF","12","DIR","PNG"];
+  const rows=[0,1].map(j=>`<div class="card" style="background:${o.bg};color:${o.fg};font-family:'${o.font}',sans-serif;font-size:${o.font_size}px;border-radius:${o.radius}px">
+    <i class="s" style="width:${o.strip_w}px;background:${o.strip}"></i>
+    <span class="n">${names[(i+j*2)%4]}</span>
+    <span class="b" style="background:${o.badge_bg};color:${o.badge_fg};border-radius:${Math.min(o.radius,9)}px">${badges[(i+j*2)%4]}</span></div>`).join("");
+  const sw=k=>`<span class="sw" style="background:${o[k]}"></span>`;
+  el.innerHTML=`<div class="stage ${mode}">${rows}</div>
+   <div class="meta"><div class="top"><span>#${i+1} ${o._tag||""} ${sw("bg")}${sw("fg")}${sw("badge_bg")}${sw("strip")}</span>
+   <span><button data-c="${i}">复制</button> <button data-d="${i}">×</button></span></div><pre>${toText(o)}</pre></div>`;
+  g.appendChild(el);
+ });
+ $("#stat").textContent=items.length?`共 ${items.length} 套`:"";
+}
+$("#grid").addEventListener("click",e=>{
+ const c=e.target.dataset.c,d=e.target.dataset.d;
+ if(c!==undefined)copy(toText(items[c]),e.target);
+ if(d!==undefined){items.splice(+d,1);render()}
+});
+async function copy(t,btn){
+ try{await navigator.clipboard.writeText(t)}catch{const a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();document.execCommand("copy");a.remove()}
+ if(btn){const o=btn.textContent;btn.textContent="✓";setTimeout(()=>btn.textContent=o,900)}
+}
+function make(append){
+ const ks=[...sel];if(!ks.length){alert("请至少选一种风格");return}
+ const n=Math.max(1,Math.min(60,+$("#cnt").value||12));
+ const arr=Array.from({length:n},(_,i)=>gen(ks[i%ks.length]));
+ for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}
+ items=append?items.concat(arr):arr;render();
+}
+$("#go").onclick=()=>make(false);
+$("#add").onclick=()=>make(true);
+$("#bk").onchange=render;
+$("#copyall").onclick=e=>copy(items.map(toText).join("\n---\n"),e.target);
+$("#clear").onclick=()=>{items=[];render()};
+
+/* ---------- 提示词 ---------- */
+const TPL=s=>`你是资深 UI 配色设计师。请为 Windows 桌面文件卡片（24px 高标签条）生成一套有辨识度、可直接落地的配色，严格只输出下列 9 行（key=value），不要代码块标记、不要解释、不要注释、不要空行。
+
+key 定义：
+bg=卡片背景(rgba)
+fg=文件名文字色(rgba)
+badge_bg=徽标背景(rgba)
+badge_fg=徽标文字色(rgba)
+strip=左侧色条色(rgba)
+strip_w=色条宽度(0-6整数)
+font=字体名称
+font_size=字号(6-18数字)
+radius=圆角半径(0-12整数,0=直角,12=胶囊)
+风格要求：${s}`;
+const upd=()=>{$("#ptext").value=TPL($("#style").value.trim()||"[在此描述你想要的风格]")};
+$("#style").oninput=upd;upd();
+Object.keys(P).concat(["复古胶片","日系清新","工业冷峻","极光渐变"]).forEach(k=>{
+ const c=document.createElement("span");c.className="chip";c.textContent=k;
+ c.onclick=()=>{$("#style").value=k;upd()};$("#pchips").appendChild(c)});
+$("#cp-prompt").onclick=e=>copy($("#ptext").value,e.target);
+
+/* ---------- 导入 ---------- */
+function parseBlocks(txt){
+ const out=[];let cur={};
+ const flush=()=>{if(Object.keys(cur).length)out.push(cur);cur={}};
+ txt.replace(/```[a-z]*/gi,"").split(/\r?\n/).forEach(raw=>{
+  const l=raw.trim();
+  if(!l||/^-{3,}$/.test(l)){flush();return}
+  const m=/^([a-z_]+)\s*=\s*(.+)$/i.exec(l);if(!m)return;
+  const k=m[1].toLowerCase();if(!KEYS.includes(k))return;
+  if(k==="bg"&&cur.bg)flush();
+  cur[k]=m[2].trim();
+ });flush();return out;
+}
+$("#parse").onclick=()=>{
+ const bl=parseBlocks($("#itext").value);
+ const def={bg:"rgba(255,255,255,0.95)",fg:"rgba(30,30,30,1)",badge_bg:"rgba(0,120,215,1)",badge_fg:"rgba(255,255,255,1)",strip:"rgba(0,120,215,1)",strip_w:3,font:"Segoe UI",font_size:12,radius:0};
+ const miss=[];
+ bl.forEach((b,i)=>{KEYS.forEach(k=>{if(b[k]===undefined){b[k]=def[k];miss.push(`#${i+1} 缺 ${k}`)}});
+  b.strip_w=Math.max(0,Math.min(6,Math.round(+b.strip_w)||0));
+  b.font_size=Math.max(6,Math.min(18,+b.font_size||12));
+  b.radius=Math.max(0,Math.min(12,Math.round(+b.radius)||0));b._tag="导入"});
+ if(!bl.length){alert("没有解析到有效的 key=value 行");return}
+ items=items.concat(bl);render();
+ $("#stat").textContent=`共 ${items.length} 套`+(miss.length?`（${miss.join("，")} 已用默认值补全）`:"");
+ scrollTo({top:document.body.scrollHeight*.3,behavior:"smooth"});
+};
+
+/* ---------- tabs ---------- */
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+ document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===t));
+ document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on",p.id==="p-"+t.dataset.t));
+});
+make(false);
+</script>
+</body>
+</html>
